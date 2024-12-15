@@ -1,5 +1,6 @@
 package com.tsymbalt.peopledb.model;
 
+import java.math.BigDecimal;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Objects;
@@ -9,6 +10,8 @@ public class Person {
     private String firstName;
     private String lastName;
     private ZonedDateTime dob;
+    private BigDecimal salary = new BigDecimal("0");;
+
 
     public ZonedDateTime getDob() {
         return dob;
@@ -49,6 +52,14 @@ public class Person {
     }
     public void setLastName(String lastName) {
         this.lastName = lastName;
+    }
+
+    public BigDecimal getSalary() {
+        return salary;
+    }
+
+    public void setSalary(BigDecimal salary) {
+        this.salary = salary;
     }
 
     @Override

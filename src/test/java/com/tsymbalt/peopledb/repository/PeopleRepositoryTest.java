@@ -5,6 +5,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -99,7 +100,24 @@ public class PeopleRepositoryTest {
          Person[] people = Arrays.asList(p1, p2, p3, p4, p5).toArray(new Person[]{});
          String ids = Arrays.stream(people).map(Person::getId).map(String::valueOf).collect(joining(","));
          System.out.println(ids);
+     }
+
+     @Test
+    public void canUpdate() {
+         Person savedPerson = repo.save(new Person("John", "Smith", ZonedDateTime.of(1981,12,15, 15,15,0,0, ZoneId.of("-6"))));
+
+         Person p1 = repo.findById(savedPerson.getId()).get();
+         savedPerson.setSalary(new BigDecimal("73000.80"));
+         repo.update(savedPerson);
+
+         Person p2 = repo.findById(savedPerson.getId()).get();
+
+         assertThat(p2.getSalary()).isNotEqualByComparingTo(p1.getSalary());
+
+
+
 
      }
+
 
 }

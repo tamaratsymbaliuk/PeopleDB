@@ -13,7 +13,7 @@ import static java.util.stream.Collectors.joining;
 
 public class PeopleRepository {
     public static final String INSERT_PERSON_SQL = "INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB) VALUES(?, ?, ?)";
-    public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB FROM PEOPLE WHERE ID=?";
+    public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE WHERE ID=?";
     private Connection connection;
     public PeopleRepository(Connection connection) {
         this.connection = connection;
@@ -25,7 +25,7 @@ public class PeopleRepository {
             PreparedStatement ps = connection.prepareStatement(INSERT_PERSON_SQL, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, person.getFirstName());
             ps.setString(2, person.getLastName());
-            ps.setTimestamp(3, Timestamp.valueOf(person.getDob().withZoneSameInstant(ZoneId.of("+0")).toLocalDateTime()));
+            ps.setTimestamp(3, convertDobToTimestamp(person.getDob()));
             int recordsAffected = ps.executeUpdate();
             ResultSet rs = ps.getGeneratedKeys();
             while (rs.next()) {
@@ -104,4 +104,24 @@ public class PeopleRepository {
             e.printStackTrace();
         }
     }
+
+    public void update(Person person) {
+        try {
+            PreparedStatement ps = connection.prepareStatement("UPDATE PEOPLE SET FIRST_NAME=?, LAST_NAME=?, DOB=? WHERE ID=?");
+            ps.setString(1,person.getFirstName());
+            ps.setString(2, person.getLastName());
+            ps.setTimestamp(3, convertDobToTimestamp(person.getDob()));
+            ps.setBigDecimal(4, person.getSalary());
+            ps.setLong(5, person.getId());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private Timestamp convertDobToTimestamp(ZonedDateTime dob) {
+        return Timestamp.valueOf(dob.withZoneSameInstant(ZoneId.of("+0")).toLocalDateTime());
+    }
+
+
 }
