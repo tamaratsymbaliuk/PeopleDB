@@ -1,90 +1,74 @@
 package com.tsymbalt.peopledb.repository;
 
-import com.tsymbalt.peopledb.exception.UnableToSaveException;
 import com.tsymbalt.peopledb.model.Person;
 
+import java.math.BigDecimal;
 import java.sql.*;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.Arrays;
-import java.util.Optional;
 
-import static java.util.stream.Collectors.joining;
 
-public class PeopleRepository {
+public class PeopleRepository extends CRUDRepository<Person> {
     public static final String INSERT_PERSON_SQL = "INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB) VALUES(?, ?, ?)";
     public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE WHERE ID=?";
-    private Connection connection;
+    public static final String FIND_ALL_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE";
+    public static final String SELECT_COUNT_SQL = "SELECT COUNT(*) FROM PEOPLE";
+    public static final String DELETE_SQL = "DELETE FROM PEOPLE WHERE ID=?";
+    public static final String DELETE_IN_SQL = "DELETE FROM PEOPLE WHERE ID IN (:ids)";
+    public static final String UPDATE_SQL = "UPDATE PEOPLE SET FIRST_NAME=?, LAST_NAME=?, DOB=? WHERE ID=?";
+
     public PeopleRepository(Connection connection) {
-        this.connection = connection;
-
+        super(connection);
+    }
+    @Override
+    void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
+        ps.setString(1, entity.getFirstName());
+        ps.setString(2, entity.getLastName());
+        ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
     }
 
-    public Person save(Person person) throws UnableToSaveException {
-        try {
-            PreparedStatement ps = connection.prepareStatement(INSERT_PERSON_SQL, Statement.RETURN_GENERATED_KEYS);
-            ps.setString(1, person.getFirstName());
-            ps.setString(2, person.getLastName());
-            ps.setTimestamp(3, convertDobToTimestamp(person.getDob()));
-            int recordsAffected = ps.executeUpdate();
-            ResultSet rs = ps.getGeneratedKeys();
-            while (rs.next()) {
-                long id = rs.getLong(1);
-                person.setId(id);
-                System.out.println(person);
-            }
-            System.out.printf("Records affected: %d%n", recordsAffected);
-        } catch (SQLException e) {
-            e.printStackTrace();
-            throw new UnableToSaveException("Tried to save a person: " + person);
-        }
-        return person;
+    @Override
+    void mapForUpdate(Person entity, PreparedStatement ps) throws SQLException {
+        ps.setString(1, entity.getFirstName());
+        ps.setString(2, entity.getLastName());
+        ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
+        ps.setBigDecimal(4, entity.getSalary());
     }
 
-    public Optional<Person> findById(Long id) {
-        Person person = null;
-
-        try {
-            PreparedStatement ps = connection.prepareStatement(FIND_BY_ID_SQL);
-            ps.setLong(1, id);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                long personId = rs.getLong("ID");
-                String firstName = rs.getString("FIRST_NAME");
-                String lastName = rs.getString("LAST_NAME");
-                ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
-                person = new Person(firstName, lastName, dob);
-                person.setId(personId);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return Optional.ofNullable(person);
+    @Override
+    String getSaveSQL() {
+        return INSERT_PERSON_SQL;
     }
 
-    public long count() {
-        long count = 0;
-        try {
-            PreparedStatement ps = connection.prepareStatement("SELECT COUNT(*) FROM PEOPLE");
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
-                count = rs.getLong(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return count;
+    @Override
+    protected String getFindByIdSQL() {
+        return FIND_BY_ID_SQL;
     }
 
-    public void delete(Person person) {
-        try {
-            PreparedStatement ps = connection.prepareStatement("DELETE FROM PEOPLE WHERE ID=?");
-            ps.setLong(1, person.getId());
-            int affectedRecordCount = ps.executeUpdate();
-            System.out.println(affectedRecordCount);
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+    @Override
+    Person extractEntityFromResultSet(ResultSet rs) throws SQLException {
+        long personId = rs.getLong("ID");
+        String firstName = rs.getString("FIRST_NAME");
+        String lastName = rs.getString("LAST_NAME");
+        ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
+        BigDecimal salary = rs.getBigDecimal("SALARY");
+
+        return new Person(personId, firstName, lastName, dob, salary);
+    }
+
+    @Override
+    protected String getFindAllSQL() {
+        return FIND_ALL_SQL;
+    }
+
+    @Override
+    protected String getCountSQL() {
+        return SELECT_COUNT_SQL;
+    }
+
+    @Override
+    protected String getDeleteSQL() {
+        return DELETE_SQL;
     }
 
     /*public void delete(Person...people) { // Person[] people
@@ -94,34 +78,17 @@ public class PeopleRepository {
     }
      */
 
-    public void delete(Person...people) {
-        try {
-            Statement stmt = connection.createStatement();
-            String ids = Arrays.stream(people).map(Person::getId).map(String::valueOf).collect(joining(","));
-            int affectedRecordsCount = stmt.executeUpdate("DELETE FROM PEOPLE WHERE ID IN (:ids)".replace(":ids",ids));
-            System.out.println(affectedRecordsCount);
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+    @Override
+    protected String getDeleteInSQL() {
+        return DELETE_IN_SQL;
     }
 
-    public void update(Person person) {
-        try {
-            PreparedStatement ps = connection.prepareStatement("UPDATE PEOPLE SET FIRST_NAME=?, LAST_NAME=?, DOB=? WHERE ID=?");
-            ps.setString(1,person.getFirstName());
-            ps.setString(2, person.getLastName());
-            ps.setTimestamp(3, convertDobToTimestamp(person.getDob()));
-            ps.setBigDecimal(4, person.getSalary());
-            ps.setLong(5, person.getId());
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+    @Override
+    protected String getUpdateSQL() {
+        return UPDATE_SQL;
     }
 
     private Timestamp convertDobToTimestamp(ZonedDateTime dob) {
         return Timestamp.valueOf(dob.withZoneSameInstant(ZoneId.of("+0")).toLocalDateTime());
     }
-
-
 }
