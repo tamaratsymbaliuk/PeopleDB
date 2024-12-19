@@ -1,6 +1,7 @@
 package com.tsymbalt.peopledb.repository;
 
 import com.tsymbalt.peopledb.annotation.SQL;
+import com.tsymbalt.peopledb.model.CrudOperation;
 import com.tsymbalt.peopledb.model.Person;
 
 import java.math.BigDecimal;
@@ -22,7 +23,7 @@ public class PeopleRepository extends CRUDRepository<Person> {
         super(connection);
     }
     @Override
-    @SQL(INSERT_PERSON_SQL)
+    @SQL(value = INSERT_PERSON_SQL, operationType = CrudOperation.UPDATE)
     void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
         ps.setString(1, entity.getFirstName());
         ps.setString(2, entity.getLastName());
@@ -30,7 +31,7 @@ public class PeopleRepository extends CRUDRepository<Person> {
     }
 
     @Override
-    @SQL(UPDATE_SQL)
+    @SQL(value = UPDATE_SQL, operationType = CrudOperation.SAVE)
     void mapForUpdate(Person entity, PreparedStatement ps) throws SQLException {
         ps.setString(1, entity.getFirstName());
         ps.setString(2, entity.getLastName());
@@ -44,6 +45,10 @@ public class PeopleRepository extends CRUDRepository<Person> {
     }
 
     @Override
+    @SQL(value = FIND_BY_ID_SQL, operationType = CrudOperation.FIND_BY_ID)
+    @SQL(value = FIND_ALL_SQL, operationType = CrudOperation.FIND_ALL)
+    @SQL(value = SELECT_COUNT_SQL, operationType = CrudOperation.COUNT)
+    @SQL(value = DELETE_SQL, operationType = CrudOperation.DELETE_ONE)
     Person extractEntityFromResultSet(ResultSet rs) throws SQLException {
         long personId = rs.getLong("ID");
         String firstName = rs.getString("FIRST_NAME");
@@ -54,20 +59,6 @@ public class PeopleRepository extends CRUDRepository<Person> {
         return new Person(personId, firstName, lastName, dob, salary);
     }
 
-    @Override
-    protected String getFindAllSQL() {
-        return FIND_ALL_SQL;
-    }
-
-    @Override
-    protected String getCountSQL() {
-        return SELECT_COUNT_SQL;
-    }
-
-    @Override
-    protected String getDeleteSQL() {
-        return DELETE_SQL;
-    }
 
     /*public void delete(Person...people) { // Person[] people
         for (Person person : people) {
@@ -75,11 +66,6 @@ public class PeopleRepository extends CRUDRepository<Person> {
         }
     }
      */
-
-    @Override
-    protected String getDeleteInSQL() {
-        return DELETE_IN_SQL;
-    }
 
 
     private Timestamp convertDobToTimestamp(ZonedDateTime dob) {
