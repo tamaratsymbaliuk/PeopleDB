@@ -1,5 +1,6 @@
 package com.tsymbalt.peopledb.repository;
 
+import com.tsymbalt.peopledb.annotation.SQL;
 import com.tsymbalt.peopledb.model.Person;
 
 import java.math.BigDecimal;
@@ -21,6 +22,7 @@ public class PeopleRepository extends CRUDRepository<Person> {
         super(connection);
     }
     @Override
+    @SQL(INSERT_PERSON_SQL)
     void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
         ps.setString(1, entity.getFirstName());
         ps.setString(2, entity.getLastName());
@@ -28,16 +30,12 @@ public class PeopleRepository extends CRUDRepository<Person> {
     }
 
     @Override
+    @SQL(UPDATE_SQL)
     void mapForUpdate(Person entity, PreparedStatement ps) throws SQLException {
         ps.setString(1, entity.getFirstName());
         ps.setString(2, entity.getLastName());
         ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
         ps.setBigDecimal(4, entity.getSalary());
-    }
-
-    @Override
-    String getSaveSQL() {
-        return INSERT_PERSON_SQL;
     }
 
     @Override
@@ -83,10 +81,6 @@ public class PeopleRepository extends CRUDRepository<Person> {
         return DELETE_IN_SQL;
     }
 
-    @Override
-    protected String getUpdateSQL() {
-        return UPDATE_SQL;
-    }
 
     private Timestamp convertDobToTimestamp(ZonedDateTime dob) {
         return Timestamp.valueOf(dob.withZoneSameInstant(ZoneId.of("+0")).toLocalDateTime());

@@ -1,14 +1,15 @@
 package com.tsymbalt.peopledb.repository;
 
+import com.tsymbalt.peopledb.annotation.SQL;
 import com.tsymbalt.peopledb.exception.UnableToSaveException;
 import com.tsymbalt.peopledb.model.Entity;
-import com.tsymbalt.peopledb.model.Person;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static java.util.stream.Collectors.joining;
 
@@ -19,9 +20,18 @@ abstract class CRUDRepository<T extends Entity> {
         this.connection = connection;
     }
 
+    private String getSQLByAnnotation(String methodName, Supplier<String> sqlGetter) {
+        Arrays.stream(this.getClass().getDeclaredMethods())
+                .filter(m-> methodName.equals(m.getName()))
+                .map(m-> m.getAnnotation(SQL.class))
+                .map(SQL::value)
+                .findFirst().orElseGet(sqlGetter);
+
+    }
+
     public T save(T entity) throws UnableToSaveException {
         try {
-            PreparedStatement ps = connection.prepareStatement(getSaveSQL(), Statement.RETURN_GENERATED_KEYS);
+            PreparedStatement ps = connection.prepareStatement(getSQLByAnnotation("mapForSave", this::getSaveSQL), Statement.RETURN_GENERATED_KEYS);
             mapForSave(entity, ps);
             int recordsAffected = ps.executeUpdate();
             ResultSet rs = ps.getGeneratedKeys();
@@ -61,7 +71,7 @@ abstract class CRUDRepository<T extends Entity> {
     }
     public void update(T entity) {
         try {
-            PreparedStatement ps = connection.prepareStatement(getUpdateSQL());
+            PreparedStatement ps = connection.prepareStatement(getSQLByAnnotation("mapForUpdate", this::getUpdateSQL));
             mapForUpdate(entity, ps);
             ps.setLong(5, entity.getId());
             ps.executeUpdate();
@@ -70,7 +80,7 @@ abstract class CRUDRepository<T extends Entity> {
         }
     }
 
-    protected abstract String getUpdateSQL();
+    protected String getUpdateSQL() {return "";}
 
 
     /**
@@ -86,7 +96,7 @@ abstract class CRUDRepository<T extends Entity> {
     abstract void mapForSave(T entity, PreparedStatement ps) throws SQLException;
     abstract void mapForUpdate(T entity, PreparedStatement ps) throws SQLException;
 
-    abstract String getSaveSQL();
+    String getSaveSQL(){return "";}
 
     public Optional<T> findById(Long id) {
         T entity = null;
@@ -141,7 +151,4 @@ abstract class CRUDRepository<T extends Entity> {
      */
     protected abstract String getFindByIdSQL();
     abstract T extractEntityFromResultSet(ResultSet rs) throws SQLException;
-
-
-
 }
