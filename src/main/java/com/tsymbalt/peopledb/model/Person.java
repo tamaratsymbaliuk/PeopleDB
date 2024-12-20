@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Objects;
+import java.util.Optional;
 
 public class Person {
     @Id
@@ -16,6 +17,7 @@ public class Person {
     private ZonedDateTime dob;
     private BigDecimal salary = new BigDecimal("0");
     private String email;
+    private Optional<Address> homeAddress = Optional.empty();
 
     public String getEmail() {
         return email;
@@ -100,5 +102,13 @@ public class Person {
     @Override
     public int hashCode() {
         return Objects.hash(id, firstName, lastName, dob);
+    }
+
+    public void setHomeAddress(Address homeAddress) {
+        this.homeAddress = Optional.ofNullable(homeAddress);
+    }
+
+    public Optional<Address> getHomeAddress() {
+        return homeAddress;
     }
 }

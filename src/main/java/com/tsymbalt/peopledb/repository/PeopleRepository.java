@@ -1,6 +1,8 @@
 package com.tsymbalt.peopledb.repository;
 
+import com.sun.jdi.PrimitiveValue;
 import com.tsymbalt.peopledb.annotation.SQL;
+import com.tsymbalt.peopledb.model.Address;
 import com.tsymbalt.peopledb.model.CrudOperation;
 import com.tsymbalt.peopledb.model.Person;
 
@@ -8,14 +10,17 @@ import java.math.BigDecimal;
 import java.sql.*;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Optional;
 
 
 public class PeopleRepository extends CRUDRepository<Person> {
+
+    private AddressRepository addressRepository = null;
     public static final String INSERT_PERSON_SQL = """
             INSERT INTO PEOPLE 
-            (FIRST_NAME, LAST_NAME, DOB, SALARY, EMAIL) VALUES(?, ?, ?, ?, ?)""";
+            (FIRST_NAME, LAST_NAME, DOB, SALARY, EMAIL, HOME_ADDRESS) VALUES(?, ?, ?, ?, ?, ?)""";
 
-    public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE WHERE ID=?";
+    public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY, HOME_ADDRESS FROM PEOPLE WHERE ID=?";
     public static final String FIND_ALL_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE";
     public static final String SELECT_COUNT_SQL = "SELECT COUNT(*) FROM PEOPLE";
     public static final String DELETE_SQL = "DELETE FROM PEOPLE WHERE ID=?";
@@ -24,15 +29,25 @@ public class PeopleRepository extends CRUDRepository<Person> {
 
     public PeopleRepository(Connection connection) {
         super(connection);
+        addressRepository = new AddressRepository(connection);
     }
     @Override
     @SQL(value = INSERT_PERSON_SQL, operationType = CrudOperation.UPDATE)
     void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
+        Address savedAddress = null;
+
         ps.setString(1, entity.getFirstName());
         ps.setString(2, entity.getLastName());
         ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
         ps.setBigDecimal(4, entity.getSalary());
         ps.setString(5, entity.getEmail());
+        if (entity.getHomeAddress().isPresent()) {
+            savedAddress = addressRepository.save(entity.getHomeAddress().get());
+            ps.setLong(6, savedAddress.id());
+        } else {
+            ps.setObject(6, null);
+        }
+
     }
 
     @Override
@@ -60,8 +75,11 @@ public class PeopleRepository extends CRUDRepository<Person> {
         String lastName = rs.getString("LAST_NAME");
         ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
         BigDecimal salary = rs.getBigDecimal("SALARY");
-
-        return new Person(personId, firstName, lastName, dob, salary);
+        long homeAddressId = rs.getLong("HOME_ADDRESS");
+        Optional<Address> homeAddress = addressRepository.findById(homeAddressId);
+        Person person = new Person(personId, firstName, lastName, dob, salary);
+        person.setHomeAddress(homeAddress.orElse(null));
+        return person;
     }
 
 

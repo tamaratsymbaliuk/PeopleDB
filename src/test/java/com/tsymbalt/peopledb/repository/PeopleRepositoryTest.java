@@ -1,8 +1,11 @@
 package com.tsymbalt.peopledb.repository;
 
+import com.tsymbalt.peopledb.model.Address;
 import com.tsymbalt.peopledb.model.Person;
+import com.tsymbalt.peopledb.model.Region;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -26,7 +29,8 @@ public class PeopleRepositoryTest {
 
     @BeforeEach
     void setUp() throws SQLException {
-        connection = DriverManager.getConnection("jdbc:h2:/Users/tamaratsymbaliuk/Documents/peopledb");
+        //connection = DriverManager.getConnection("jdbc:h2:/Users/tamaratsymbaliuk/Documents/peopledb");
+        connection = DriverManager.getConnection("jdbc:h2:~/peopledb".replace("~", System.getProperty("user.home")));
         connection.setAutoCommit(false);
         repo = new PeopleRepository(connection);
     }
@@ -53,6 +57,27 @@ public class PeopleRepositoryTest {
         Person savedPerson2 = repo.save(john);
         assertThat(savedPerson1.getId()).isNotEqualTo(savedPerson2.getId());
     }
+    @Test
+    public void canSavePersonWithAddress() throws SQLException {
+        Person john = new Person("Sam", "Smith", ZonedDateTime.of(1980,11,15, 15,15,0,0, ZoneId.of("-6")));
+        Address address = new Address(null, "123 Bill St.", "Apt. 2B", "Washington", "DC", "99455", "United States", "Fulton County", Region.WEST);
+        john.setHomeAddress(address);
+
+        Person savedPerson = repo.save(john);
+        assertThat(savedPerson.getHomeAddress().get().id()).isGreaterThan(0);
+       // connection.commit();
+    }
+    @Test
+    public void canFindPersonByIdWithAddress() throws SQLException {
+        Person john = new Person("Sam", "Smith", ZonedDateTime.of(1980,11,15, 15,15,0,0, ZoneId.of("-6")));
+        Address address = new Address(null, "123 Bill St.", "Apt. 2B", "Washington", "DC", "99455", "United States", "Fulton County", Region.WEST);
+        john.setHomeAddress(address);
+
+        Person savedPerson = repo.save(john);
+        Person foundPerson = repo.findById(savedPerson.getId()).get();
+        assertThat(foundPerson.getHomeAddress().get().state()).isEqualTo("WA");
+    }
+
     @Test
     public void canFindPersonById() {
         Person savedPerson = repo.save(new Person("test", "Smith", ZonedDateTime.now()));
@@ -119,7 +144,8 @@ public class PeopleRepositoryTest {
 
      }
 
-     @Test
+     @Test // load 5 mil records to the DB
+     @Disabled
      public void loadData() throws IOException, SQLException {
          Files.lines(Path.of("/Users/tamaratsymbaliuk/Downloads/Hr5m.csv"))
                  .skip(1)
@@ -138,5 +164,7 @@ public class PeopleRepositoryTest {
                  .forEach(repo::save); // p -> repo.save(p)
          connection.commit();// adding this line to actually commit data to the DB
      }
+
+
 
 }
