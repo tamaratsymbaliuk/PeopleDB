@@ -1,10 +1,10 @@
 package com.tsymbalt.peopledb.repository;
 
+import com.tsymbalt.peopledb.annotation.Id;
 import com.tsymbalt.peopledb.annotation.MultiSQL;
 import com.tsymbalt.peopledb.annotation.SQL;
 import com.tsymbalt.peopledb.exception.UnableToSaveException;
 import com.tsymbalt.peopledb.model.CrudOperation;
-import com.tsymbalt.peopledb.model.Entity;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -16,7 +16,7 @@ import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.joining;
 
-abstract class CRUDRepository<T extends Entity> {
+abstract class CRUDRepository<T> {
     protected Connection connection;
 
     public CRUDRepository(Connection connection) {
@@ -47,7 +47,8 @@ abstract class CRUDRepository<T extends Entity> {
             ResultSet rs = ps.getGeneratedKeys();
             while (rs.next()) {
                 long id = rs.getLong(1);
-                entity.setId(id);
+                //entity.setId(id);
+                setIdByAnnotation(id, entity);
                 System.out.println(entity);
             }
             System.out.printf("Records affected: %d%n", recordsAffected);
@@ -61,7 +62,8 @@ abstract class CRUDRepository<T extends Entity> {
     public void delete(T entity) {
         try {
             PreparedStatement ps = connection.prepareStatement(getSQLByAnnotation(CrudOperation.DELETE_ONE, this::getDeleteSQL));
-            ps.setLong(1, entity.getId());
+            //ps.setLong(1, entity.getId());
+            ps.setLong(1, getIdByAnnotation(entity));
             int affectedRecordCount = ps.executeUpdate();
             System.out.println(affectedRecordCount);
         } catch (SQLException e) {
@@ -69,10 +71,38 @@ abstract class CRUDRepository<T extends Entity> {
         }
     }
 
+    private Long getIdByAnnotation(T entity) {
+       return Arrays.stream(entity.getClass().getDeclaredFields())
+                .filter(f-> f.isAnnotationPresent(Id.class))
+                .map(f-> {
+                    f.setAccessible(true); // setting this as Id is private so we can access it
+                    Long id = null;
+                    try {
+                        id = (long)f.get(entity);
+                    } catch (IllegalAccessException e) {
+                        e.printStackTrace();
+                    }
+                    return id;
+                })
+                .findFirst().orElseThrow(() -> new RuntimeException("No ID annotated field found"));
+    }
+    private void setIdByAnnotation(Long id, T entity) {
+        Arrays.stream(entity.getClass().getDeclaredFields())
+                .filter(f -> f.isAnnotationPresent(Id.class))
+                .forEach(f -> {
+                    f.setAccessible(true); // setting this as Id is private so we can access it
+                    try {
+                        f.set(entity, id);
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException("Unable to set Id field value");
+                    }
+                });
+    }
+
     public void delete(T...entities) {
         try {
             Statement stmt = connection.createStatement();
-            String ids = Arrays.stream(entities).map(T::getId).map(String::valueOf).collect(joining(","));
+            String ids = Arrays.stream(entities).map(e-> getIdByAnnotation(e)).map(String::valueOf).collect(joining(","));
             int affectedRecordsCount = stmt.executeUpdate(getSQLByAnnotation(CrudOperation.DELETE_MANY, this::getDeleteInSQL).replace(":ids",ids));
             System.out.println(affectedRecordsCount);
         } catch (SQLException e) {
@@ -83,7 +113,7 @@ abstract class CRUDRepository<T extends Entity> {
         try {
             PreparedStatement ps = connection.prepareStatement(getSQLByAnnotation(CrudOperation.UPDATE, this::getUpdateSQL));
             mapForUpdate(entity, ps);
-            ps.setLong(5, entity.getId());
+            ps.setLong(5, getIdByAnnotation(entity));
             ps.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
