@@ -10,6 +10,8 @@ import java.math.BigDecimal;
 import java.sql.*;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 
@@ -34,6 +36,8 @@ public class PeopleRepository extends CRUDRepository<Person> {
     public static final String DELETE_SQL = "DELETE FROM PEOPLE WHERE ID=?";
     public static final String DELETE_IN_SQL = "DELETE FROM PEOPLE WHERE ID IN (:ids)";
     public static final String UPDATE_SQL = "UPDATE PEOPLE SET FIRST_NAME=?, LAST_NAME=?, DOB=? WHERE ID=?";
+
+    private Map<String, Integer> aliasColIdxMapCashe = new HashMap<>();
 
     public PeopleRepository(Connection connection) {
         super(connection);
@@ -117,12 +121,23 @@ public class PeopleRepository extends CRUDRepository<Person> {
 
     private <T> T getValueByAlias(String alias, ResultSet rs, Class<T> clazz) throws SQLException {
         int columnCount = rs.getMetaData().getColumnCount();
-        for (int colIdx=1; colIdx <= columnCount; colIdx++) {
-            if (alias.equals(rs.getMetaData().getColumnLabel(colIdx))) {
-                return (T) rs.getObject(colIdx);
+        int foundIdx = getIndexForAlias(alias, rs, columnCount);
+        return foundIdx == 0 ? null : (T) rs.getObject(foundIdx);
+
+    }
+
+    private int getIndexForAlias(String alias, ResultSet rs, int columnCount) throws SQLException {
+        Integer foundIdx = aliasColIdxMapCashe.getOrDefault(alias, 0);
+        if (foundIdx == 0) {
+            for (int colIdx = 1; colIdx <= columnCount; colIdx++) {
+                if (alias.equals(rs.getMetaData().getColumnLabel(colIdx))) {
+                    foundIdx = colIdx;
+                    aliasColIdxMapCashe.put(alias, foundIdx);
+                    break;
+                }
             }
         }
-        throw new SQLException(String.format("Column not found for alias: '%s'", alias));
+        return foundIdx;
     }
 
 
