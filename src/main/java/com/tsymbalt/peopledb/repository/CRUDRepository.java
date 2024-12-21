@@ -3,6 +3,7 @@ package com.tsymbalt.peopledb.repository;
 import com.tsymbalt.peopledb.annotation.Id;
 import com.tsymbalt.peopledb.annotation.MultiSQL;
 import com.tsymbalt.peopledb.annotation.SQL;
+import com.tsymbalt.peopledb.exception.DataException;
 import com.tsymbalt.peopledb.exception.UnableToSaveException;
 import com.tsymbalt.peopledb.model.CrudOperation;
 
@@ -18,9 +19,17 @@ import static java.util.stream.Collectors.joining;
 
 abstract class CRUDRepository<T> {
     protected Connection connection;
+    private PreparedStatement savePS;
+    private PreparedStatement findByIdPS;
 
     public CRUDRepository(Connection connection) {
-        this.connection = connection;
+        try {
+            this.connection = connection;
+            savePS = connection.prepareStatement(getSQLByAnnotation(CrudOperation.SAVE, this::getSaveSQL), Statement.RETURN_GENERATED_KEYS);
+            findByIdPS = connection.prepareStatement(getSQLByAnnotation(CrudOperation.FIND_BY_ID, this::getFindByIdSQL));
+        } catch (SQLException e) {
+            throw new DataException("Unable to create prepared statements for CrudRepository", e);
+        }
     }
 
     private String getSQLByAnnotation(CrudOperation operationType, Supplier<String> sqlGetter) {
@@ -41,10 +50,9 @@ abstract class CRUDRepository<T> {
 
     public T save(T entity) throws UnableToSaveException {
         try {
-            PreparedStatement ps = connection.prepareStatement(getSQLByAnnotation(CrudOperation.SAVE, this::getSaveSQL), Statement.RETURN_GENERATED_KEYS);
-            mapForSave(entity, ps);
-            int recordsAffected = ps.executeUpdate();
-            ResultSet rs = ps.getGeneratedKeys();
+            mapForSave(entity, savePS);
+            int recordsAffected = savePS.executeUpdate();
+            ResultSet rs = savePS.getGeneratedKeys();
             while (rs.next()) {
                 long id = rs.getLong(1);
                 //entity.setId(id);
@@ -137,9 +145,8 @@ abstract class CRUDRepository<T> {
         T entity = null;
 
         try {
-            PreparedStatement ps = connection.prepareStatement(getSQLByAnnotation(CrudOperation.FIND_BY_ID, this::getFindByIdSQL));
-            ps.setLong(1, id);
-            ResultSet rs = ps.executeQuery();
+            findByIdPS.setLong(1, id);
+            ResultSet rs = findByIdPS.executeQuery();
             while (rs.next()) {
                 entity = extractEntityFromResultSet(rs);
             }
